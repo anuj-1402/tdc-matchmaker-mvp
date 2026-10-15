@@ -1,7 +1,7 @@
 # TDC Matchmaker MVP — Executive Matchmaking & Intelligence Platform
 
-> **Live Hosted Demo:** [https://tdc-matchmaker-mvp.vercel.app](https://tdc-matchmaker-mvp.vercel.app) *(or your deployed Vercel URL)*  
-> **GitHub Repository:** [https://github.com/arck-knight/tdc-matchmaker-mvp](https://github.com/arck-knight/tdc-matchmaker-mvp)  
+> **Live Hosted Demo:** [https://tdc-matchmaker-mvp-pnwl.vercel.app/login](https://tdc-matchmaker-mvp-pnwl.vercel.app/login)  
+> **GitHub Repository:** [https://github.com/anuj-1402/tdc-matchmaker-mvp](https://github.com/anuj-1402/tdc-matchmaker-mvp)  
 > **Tech Stack:** Next.js 16 (App Router, Turbopack) · TypeScript · React 19 · PostgreSQL · Prisma ORM · Tailwind CSS · Zod · Argon2id · OpenAI API · Vitest
 
 ---
