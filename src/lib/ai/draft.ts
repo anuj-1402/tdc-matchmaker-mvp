@@ -193,3 +193,92 @@ Your TDC Matchmaker`;
     modelUsed: "TDC Adaptive Synthesizer",
   };
 }
+
+// ─── AI Matchmaker Fit Analysis & Strategy Rationale ─────────────────────────
+
+export interface FitAnalysisResult {
+  fitRationale: string;
+  keyStrengths: string[];
+  strategicAdvice: string;
+  source: "ai" | "template";
+  modelUsed?: string;
+}
+
+const FIT_SYSTEM_PROMPT = `You are a Senior Matchmaking Director at TDC providing internal strategy to matchmakers.
+Analyze why a candidate profile is a strong strategic fit for a private client.
+Return strictly a valid JSON object with keys:
+"fitRationale" (string, 2-3 sentences explaining core lifestyle and values synergy),
+"keyStrengths" (array of 3 specific strings highlighting alignment pillars),
+"strategicAdvice" (string, 1-2 actionable sentences on how the matchmaker should present this profile to the client).
+Never include sensitive caste, religion, or salary figures.`;
+
+export async function generateFitAnalysis(
+  input: DraftInput
+): Promise<FitAnalysisResult> {
+  const aiConfig = getOpenAIClient();
+
+  if (!aiConfig) {
+    return generateFallbackFitAnalysis(input);
+  }
+
+  const { client, model } = aiConfig;
+
+  try {
+    const prompt = `Analyze matchmaker fit:
+Client: ${input.customerFirstName}, based in ${input.customerCity || "city"}, profession: ${input.customerProfession || "Professional"}.
+Candidate: ${input.candidateFirstName}, age ${input.candidateAge || 28}, based in ${input.candidateCity}, working as ${input.candidateProfession || "Professional"}${input.candidateCompany ? ` at ${input.candidateCompany}` : ""}.
+Key verified alignments: ${input.verifiedReasons.join(", ") || "complementary goals"}.
+Values: ${(input.candidateValues || []).join(", ") || "family, growth"}.
+Return valid JSON: {"fitRationale": string, "keyStrengths": string[], "strategicAdvice": string}.`;
+
+    const response = await Promise.race([
+      client.chat.completions.create({
+        model,
+        messages: [
+          { role: "system", content: FIT_SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 400,
+        temperature: 0.6,
+        response_format: { type: "json_object" },
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), 10000)
+      ),
+    ]);
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) return generateFallbackFitAnalysis(input);
+
+    const parsed = JSON.parse(content);
+    return {
+      fitRationale: parsed.fitRationale || generateMatchSummary(input),
+      keyStrengths: Array.isArray(parsed.keyStrengths) && parsed.keyStrengths.length > 0
+        ? parsed.keyStrengths
+        : input.verifiedReasons.slice(0, 3),
+      strategicAdvice: parsed.strategicAdvice || "Emphasize mutual life goals and relocation flexibility during your consultation call.",
+      source: "ai",
+      modelUsed: model,
+    };
+  } catch (err: any) {
+    console.warn("[AI] Fit analysis fallback activated:", err.message);
+    return generateFallbackFitAnalysis(input);
+  }
+}
+
+export function generateFallbackFitAnalysis(input: DraftInput): FitAnalysisResult {
+  const candidate = input.candidateFirstName;
+  const client = input.customerFirstName;
+  const city = input.candidateCity;
+  const role = input.candidateProfession || "Established professional";
+
+  return {
+    fitRationale: `${candidate} is a compelling match for ${client} due to strong harmony between their life stages and personal outlooks. Based in ${city} as ${role}, their profile shows high alignment across core family values and future expectations.`,
+    keyStrengths: input.verifiedReasons.length > 0
+      ? input.verifiedReasons.slice(0, 3)
+      : ["Strong career alignment", "Compatible family outlook", "Complementary lifestyle pace"],
+    strategicAdvice: `Frame this introduction around their shared values in ${(input.candidateValues || []).slice(0, 2).join(" and ") || "personal growth"}. If location logistics arise, emphasize their openness to modern flexible arrangements.`,
+    source: "template",
+    modelUsed: "TDC Adaptive Synthesizer",
+  };
+}

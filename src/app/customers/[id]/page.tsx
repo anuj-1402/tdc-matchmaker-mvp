@@ -86,6 +86,12 @@ export default function CustomerDetailPage({
   const [sendingMatch, setSendingMatch] = useState(false);
   const [sendSuccessToast, setSendSuccessToast] = useState<string | null>(null);
 
+  // AI Fit Analysis Modal state
+  const [fitModalOpen, setFitModalOpen] = useState(false);
+  const [activeCandidateForFit, setActiveCandidateForFit] = useState<any>(null);
+  const [fitAnalysisData, setFitAnalysisData] = useState<any>(null);
+  const [loadingFitAnalysis, setLoadingFitAnalysis] = useState(false);
+
   // Load customer details
   useEffect(() => {
     async function loadCustomer() {
@@ -306,6 +312,34 @@ export default function CustomerDetailPage({
       alert(err.message || "Failed to send match");
     } finally {
       setSendingMatch(false);
+    }
+  }
+
+  // Open Fit Analysis Modal
+  async function openFitModal(candidate: any) {
+    setActiveCandidateForFit(candidate);
+    setFitModalOpen(true);
+    setLoadingFitAnalysis(true);
+    setFitAnalysisData(null);
+
+    try {
+      const res = await fetch("/api/matches/fit-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: customer.id,
+          candidateId: candidate.candidateId,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.fitAnalysis) {
+        setFitAnalysisData(data.fitAnalysis);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingFitAnalysis(false);
     }
   }
 
@@ -942,11 +976,20 @@ export default function CustomerDetailPage({
 
                         <div className="flex items-center gap-2">
                           <button
+                            onClick={() => openFitModal(m)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition cursor-pointer"
+                            title="Generate AI Matchmaker Fit Analysis & Consultation Talking Points"
+                          >
+                            <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                            <span>Why Fit? (AI)</span>
+                          </button>
+
+                          <button
                             onClick={() => openDraftModal(m)}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition cursor-pointer"
                           >
-                            <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                            <span>Draft AI Intro</span>
+                            <MessageSquare className="h-3.5 w-3.5 text-slate-300" />
+                            <span>Draft Intro</span>
                           </button>
 
                           <button
@@ -1371,6 +1414,102 @@ export default function CustomerDetailPage({
                     <span>Confirm Mock Send</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Matchmaker Fit Analysis Modal */}
+      {fitModalOpen && activeCandidateForFit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-700 max-w-xl w-full space-y-5 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">AI Matchmaker Fit Analysis</h3>
+                  <p className="text-xs text-slate-400">
+                    Strategic Rationale: {activeCandidateForFit.fullName} & {customer.fullName}
+                  </p>
+                </div>
+              </div>
+
+              <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border bg-amber-500/10 text-amber-300 border-amber-500/30">
+                {fitAnalysisData?.modelUsed || "Live AI Reasoning"}
+              </span>
+            </div>
+
+            {loadingFitAnalysis ? (
+              <div className="py-12 flex flex-col items-center justify-center space-y-3">
+                <RefreshCw className="h-7 w-7 text-amber-400 animate-spin" />
+                <p className="text-xs text-slate-300">
+                  Analyzing strategic synergy, career trajectory, and life goals...
+                </p>
+              </div>
+            ) : fitAnalysisData ? (
+              <div className="space-y-4 text-xs">
+                {/* Fit Rationale */}
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                  <span className="text-[11px] font-semibold text-amber-300 uppercase tracking-wider">
+                    Core Synergy Rationale
+                  </span>
+                  <p className="text-slate-200 leading-relaxed">
+                    {fitAnalysisData.fitRationale}
+                  </p>
+                </div>
+
+                {/* Key Pillars */}
+                <div className="space-y-2">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Compatibility Pillars
+                  </span>
+                  <div className="space-y-1.5">
+                    {fitAnalysisData.keyStrengths?.map((str: string, idx: number) => (
+                      <div key={idx} className="flex items-start gap-2 p-2 rounded-lg bg-slate-900/60 border border-slate-800/80 text-slate-300">
+                        <Check className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{str}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Strategic Matchmaker Pitch Advice */}
+                <div className="p-4 rounded-xl bg-indigo-950/40 border border-indigo-500/30 space-y-1">
+                  <span className="text-[11px] font-semibold text-indigo-300 uppercase tracking-wider">
+                    Matchmaker Consultation Talking Points
+                  </span>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">
+                    {fitAnalysisData.strategicAdvice}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 text-center text-xs text-slate-400">
+                Failed to generate fit analysis.
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setFitModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setFitModalOpen(false);
+                  openDraftModal(activeCandidateForFit);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-amber-500 to-rose-500 hover:opacity-90 transition shadow-md shadow-amber-500/20 cursor-pointer"
+              >
+                Draft Intro Email →
               </button>
             </div>
           </div>
