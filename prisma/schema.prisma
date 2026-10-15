@@ -1,0 +1,250 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  MATCHMAKER
+  ADMIN
+}
+
+enum TriState {
+  YES
+  NO
+  MAYBE
+}
+
+enum JourneyStage {
+  NEW
+  PROFILE_REVIEW
+  VERIFIED
+  IN_MATCHING
+  MATCH_SENT
+  AWAITING_FEEDBACK
+  MATCHED
+  ON_HOLD
+  CLOSED
+}
+
+enum VerificationStatus {
+  DEMO_VERIFIED
+  UNVERIFIED
+}
+
+enum InteractionType {
+  CALL
+  MEETING
+  OTHER
+}
+
+enum MatchChannel {
+  MOCK_EMAIL
+}
+
+enum MatchSendStatus {
+  MOCK_SENT
+}
+
+// ─── Staff / Matchmaker ──────────────────────────────────────────────────────
+
+model Matchmaker {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  displayName  String
+  passwordHash String
+  role         Role     @default(MATCHMAKER)
+  createdAt    DateTime @default(now())
+
+  // Relations
+  customers    Customer[]
+  notes        CustomerNote[]
+  journeyEvents JourneyEvent[]
+  matchSuggestions MatchSuggestionEvent[]
+}
+
+// ─── Customer (assigned to a matchmaker) ─────────────────────────────────────
+
+model Customer {
+  id                    String             @id @default(cuid())
+  assignedMatchmakerId  String
+  assignedMatchmaker    Matchmaker         @relation(fields: [assignedMatchmakerId], references: [id])
+
+  // Biodata fields (per PDF specification)
+  firstName             String
+  lastName              String
+  gender                String
+  dateOfBirth           DateTime
+  country               String
+  city                  String
+  heightCm              Int                // 120–230 cm plausible range
+  email                 String             // synthetic only in seed
+  phoneNumber           String?            // +91 fictional placeholders
+  undergraduateCollege  String?
+  degree                String?
+  incomeAnnual          Int?               // non-negative integer, INR
+  incomeCurrency        String             @default("INR")
+  currentCompany        String?
+  designation           String?
+  maritalStatus         String
+  languagesKnown        String[]           // stored as text array
+  siblings              Int?
+  caste                 String?            // sensitive — never used in ranking
+  religion              String?            // sensitive — never used in ranking
+  wantKids              TriState           @default(MAYBE)
+  openToRelocate        TriState           @default(MAYBE)
+  openToPets            TriState           @default(MAYBE)
+  values                String[]           // e.g. ["family", "learning", "career"]
+  professionCategory    String?
+
+  // Status
+  verificationStatus    VerificationStatus @default(UNVERIFIED)
+  journeyStage          JourneyStage       @default(NEW)
+
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  // Relations
+  partnerPreferences    PartnerPreferences?
+  notes                 CustomerNote[]
+  journeyEvents         JourneyEvent[]
+  matchSuggestions      MatchSuggestionEvent[]
+
+  @@index([assignedMatchmakerId, journeyStage])
+}
+
+// ─── Candidate (synthetic pool for matching) ────────────────────────────────
+
+model Candidate {
+  id                    String             @id @default(cuid())
+
+  // Same biodata fields as Customer
+  firstName             String
+  lastName              String
+  gender                String
+  dateOfBirth           DateTime
+  country               String
+  city                  String
+  heightCm              Int
+  email                 String
+  phoneNumber           String?
+  undergraduateCollege  String?
+  degree                String?
+  incomeAnnual          Int?
+  incomeCurrency        String             @default("INR")
+  currentCompany        String?
+  designation           String?
+  maritalStatus         String
+  languagesKnown        String[]
+  siblings              Int?
+  caste                 String?
+  religion              String?
+  wantKids              TriState           @default(MAYBE)
+  openToRelocate        TriState           @default(MAYBE)
+  openToPets            TriState           @default(MAYBE)
+  values                String[]
+  professionCategory    String?
+
+  // Candidate-specific
+  verificationStatus    VerificationStatus @default(DEMO_VERIFIED)
+  active                Boolean            @default(true)
+  synthetic             Boolean            @default(true)
+
+  // Candidate preferences (simplified for matching)
+  preferredMinAge       Int?
+  preferredMaxAge       Int?
+  preferredMinHeightCm  Int?
+  preferredMaxHeightCm  Int?
+  preferredMinIncome    Int?
+  preferredCities       String[]
+  preferredMaritalStatuses String[]
+  preferredRelocation   TriState?
+  preferredKids         TriState?
+
+  createdAt             DateTime           @default(now())
+
+  // Relations
+  matchSuggestions      MatchSuggestionEvent[]
+
+  @@index([gender, active, verificationStatus])
+}
+
+// ─── Partner Preferences (per customer, user-entered) ────────────────────────
+
+model PartnerPreferences {
+  id                      String     @id @default(cuid())
+  customerId              String     @unique
+  customer                Customer   @relation(fields: [customerId], references: [id])
+
+  minAge                  Int?
+  maxAge                  Int?
+  minHeightCm             Int?
+  maxHeightCm             Int?
+  minIncome               Int?
+  desiredCities           String[]
+  desiredCountries        String[]
+  desiredMaritalStatuses  String[]
+  preferredRelocation     TriState?
+  kidsPreference          TriState?
+  petsPreference          TriState?
+  desiredValues           String[]
+  professionPreferences   String[]
+}
+
+// ─── Customer Notes ──────────────────────────────────────────────────────────
+
+model CustomerNote {
+  id              String          @id @default(cuid())
+  customerId      String
+  customer        Customer        @relation(fields: [customerId], references: [id])
+  authorId        String
+  author          Matchmaker      @relation(fields: [authorId], references: [id])
+  body            String          // up to 2000 chars, validated in app
+  interactionType InteractionType @default(OTHER)
+  createdAt       DateTime        @default(now())
+
+  @@index([customerId, createdAt(sort: Desc)])
+}
+
+// ─── Journey Events (audit trail for stage changes) ──────────────────────────
+
+model JourneyEvent {
+  id         String       @id @default(cuid())
+  customerId String
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  actorId    String
+  actor      Matchmaker   @relation(fields: [actorId], references: [id])
+  fromStage  JourneyStage
+  toStage    JourneyStage
+  createdAt  DateTime     @default(now())
+
+  @@index([customerId, createdAt(sort: Desc)])
+}
+
+// ─── Match Suggestion Events ─────────────────────────────────────────────────
+
+model MatchSuggestionEvent {
+  id            String          @id @default(cuid())
+  customerId    String
+  customer      Customer        @relation(fields: [customerId], references: [id])
+  candidateId   String
+  candidate     Candidate       @relation(fields: [candidateId], references: [id])
+  actorId       String
+  actor         Matchmaker      @relation(fields: [actorId], references: [id])
+  scoreSnapshot Json            // frozen scoring details at time of send
+  introDraft    String?         // AI-generated or template intro text
+  channel       MatchChannel    @default(MOCK_EMAIL)
+  status        MatchSendStatus @default(MOCK_SENT)
+  createdAt     DateTime        @default(now())
+
+  @@unique([customerId, candidateId, channel])
+  @@index([customerId, candidateId])
+}
