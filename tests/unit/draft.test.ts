@@ -37,7 +37,8 @@ describe("Intro Draft Generator", () => {
     const words = draft.body.trim().split(/\s+/).length;
 
     expect(words).toBeLessThanOrEqual(120);
-    expect(draft.subject).toBe("Potential introduction — Asha and Arjun");
+    expect(draft.subject).toContain("Asha");
+    expect(draft.subject).toContain("Arjun");
   });
 
   it("never includes sensitive fields like caste, religion, or exact salary in fallback", () => {

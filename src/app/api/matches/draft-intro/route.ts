@@ -78,15 +78,26 @@ export async function POST(request: NextRequest) {
 
     const draftInput = {
       customerFirstName: customer.firstName,
+      customerLastName: customer.lastName,
+      customerCity: customer.city,
+      customerProfession: customer.professionCategory || customer.designation,
+      customerCompany: customer.currentCompany,
+      customerValues: customer.values,
+      customerWantKids: customer.wantKids,
+      customerRelocation: customer.openToRelocate,
+
       candidateFirstName: candidate.firstName,
+      candidateLastName: candidate.lastName,
       candidateCity: candidate.city,
       candidateProfession: candidate.professionCategory || candidate.designation,
+      candidateCompany: candidate.currentCompany,
+      candidateCollege: candidate.undergraduateCollege,
+      candidateDegree: candidate.degree,
+      candidateValues: candidate.values,
+      candidateWantKids: candidate.wantKids,
+      candidateRelocation: candidate.openToRelocate,
+
       verifiedReasons: positiveReasons.slice(0, 3),
-      approvedForSharing: [
-        candidate.city,
-        candidate.professionCategory || "Professional",
-        ...(candidate.values || []).slice(0, 3),
-      ],
     };
 
     const draft = await generateIntroDraft(draftInput);

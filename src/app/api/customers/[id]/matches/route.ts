@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireCustomerOwnership } from "@/lib/auth/session";
 import { rankCandidates, getScoreLabel, getCoverageLabel } from "@/lib/matching/score";
 import { calculateAge, formatHeight, formatIncome } from "@/lib/utils/format";
+import { generateMatchSummary } from "@/lib/ai/draft";
 
 export async function GET(
   request: NextRequest,
@@ -130,6 +131,18 @@ export async function GET(
         coverageLabel: coverageText,
         topReasons: scored.topReasons,
         tradeoffs: scored.tradeoffs,
+        executiveSummary: generateMatchSummary({
+          customerFirstName: customer.firstName,
+          customerCity: customer.city,
+          candidateFirstName: cand.firstName,
+          candidateCity: cand.city,
+          candidateProfession: cand.professionCategory || cand.designation,
+          candidateCompany: cand.currentCompany,
+          candidateValues: cand.values,
+          candidateWantKids: cand.wantKids,
+          candidateRelocation: cand.openToRelocate,
+          verifiedReasons: scored.topReasons,
+        }),
         breakdown: scored.features,
         mockSent: !!sentRecord,
         mockSentAt: sentRecord?.createdAt || null,

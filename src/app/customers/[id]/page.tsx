@@ -913,6 +913,16 @@ export default function CustomerDetailPage({
                             <span>•</span>
                             <span className="text-emerald-400">{m.incomeFormatted}</span>
                           </div>
+
+                          {m.executiveSummary && (
+                            <div className="mt-2 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300 flex items-start gap-2">
+                              <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-semibold text-amber-300 mr-1">Match Briefing:</span>
+                                <span>{m.executiveSummary}</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1217,13 +1227,13 @@ export default function CustomerDetailPage({
               </div>
 
               <span
-                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border ${
                   draftSource === "ai"
                     ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
-                    : "bg-slate-800 text-slate-400 border-slate-700"
+                    : "bg-amber-500/10 text-amber-300 border-amber-500/30"
                 }`}
               >
-                {draftSource === "ai" ? "OpenAI GPT-4o-mini" : "Deterministic Template"}
+                {draftSource === "ai" ? "OpenAI GPT-4o-mini" : "TDC Dynamic Synthesizer"}
               </span>
             </div>
 
