@@ -49,66 +49,51 @@ export interface DraftResult {
 
 // ─── OpenAI Client ───────────────────────────────────────────────────────────
 
-function getOpenAIClient(): OpenAI | null {
+function getOpenAIClient(): { client: OpenAI; model: string } | null {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey || apiKey === "sk-..." || apiKey.length < 20) {
     return null;
   }
-  return new OpenAI({ apiKey });
+  const baseURL = process.env.OPENAI_BASE_URL || undefined;
+  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const client = new OpenAI({ apiKey, baseURL });
+  return { client, model };
 }
 
 // ─── System Prompt ───────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are an elite executive matchmaker at TDC. You draft elegant, warm, highly personalized introduction emails for your private clients.
-Rules:
-1. Synthesize the candidate's career, education, and location with mutual life alignment (family values, life goals, relocation).
-2. Avoid generic boilerplate like "I wanted to share X profile". Make it feel curated and human.
-3. STRICT PRIVACY GUARDRAILS: Never mention caste, religion, salary/income figures, direct email/phone numbers, or full birthdates.
-4. Keep the body concise: maximum 120 words.
-5. Return strictly valid JSON: {"subject": string, "body": string, "summary": string} where summary is a 2-sentence matchmaker rationale under 40 words.`;
+You must return only a valid JSON object with exactly two keys: "subject" (a string for the email subject line) and "body" (a string containing the warm intro email, maximum 120 words).
+Never mention caste, religion, salary figures, or contact info. Keep it warm, curated, and respectful.`;
 
 // ─── AI Draft Generator ──────────────────────────────────────────────────────
 
 export async function generateIntroDraft(
   input: DraftInput
 ): Promise<DraftResult> {
-  const client = getOpenAIClient();
+  const aiConfig = getOpenAIClient();
 
-  if (!client) {
+  if (!aiConfig) {
     console.log("[AI] No API key configured — using dynamic synthesis fallback");
     return generateFallbackDraft(input);
   }
 
+  const { client, model } = aiConfig;
+
   try {
-    const userMessage = JSON.stringify({
-      client: {
-        firstName: input.customerFirstName,
-        city: input.customerCity || "their home city",
-        profession: input.customerProfession || "Professional",
-        values: input.customerValues || [],
-      },
-      candidate: {
-        firstName: input.candidateFirstName,
-        age: input.candidateAge,
-        city: input.candidateCity,
-        profession: input.candidateProfession ?? "Professional",
-        company: input.candidateCompany,
-        college: input.candidateCollege,
-        degree: input.candidateDegree,
-        values: input.candidateValues || [],
-        wantKids: input.candidateWantKids,
-        relocation: input.candidateRelocation,
-      },
-      matchStrengths: input.verifiedReasons,
-      matchScore: input.score,
-    });
+    const userPrompt = `Draft an introduction email in JSON format: {"subject": string, "body": string}.
+Client: ${input.customerFirstName} based in ${input.customerCity || "city"}
+Candidate: ${input.candidateFirstName}, ${input.candidateAge || 28} years old, based in ${input.candidateCity}, working as ${input.candidateProfession || "Professional"}${input.candidateCompany ? ` at ${input.candidateCompany}` : ""}
+Shared alignment strengths: ${input.verifiedReasons.join(", ") || "compatible values and life goals"}
+Values: ${(input.candidateValues || []).join(", ") || "personal growth and family"}
+Ensure the response is strictly a valid JSON object with keys "subject" and "body". Body must be under 120 words.`;
 
     const response = await Promise.race([
       client.chat.completions.create({
-        model: "gpt-4o-mini",
+        model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userMessage },
+          { role: "user", content: userPrompt },
         ],
         max_tokens: 350,
         temperature: 0.7,
@@ -145,7 +130,7 @@ export async function generateIntroDraft(
       body: cappedBody,
       summary: parsed.summary || generateMatchSummary(input),
       source: "ai",
-      modelUsed: "gpt-4o-mini",
+      modelUsed: model,
     };
   } catch (error: any) {
     console.warn("[AI] Notice: OpenAI request did not complete (e.g. quota or timeout):", error.message);
